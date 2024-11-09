@@ -161,6 +161,20 @@ class PawsManager:
         self.session.headers.update(self.headers)
     
     def _initialize_headers(self):
+        """Inicializa os headers com plataforma consistente"""
+        user_agent = UserAgent().random
+        
+        # Detecta a plataforma baseado no User-Agent
+        platform = "Windows"  # default
+        if "Linux" in user_agent:
+            platform = "Linux"
+        elif "Mac" in user_agent:
+            platform = "macOS"
+        elif "Android" in user_agent:
+            platform = "Android"
+        elif "iPhone" or "iPad" in user_agent:
+            platform = "iOS"
+        
         return {
             "accept": "application/json",
             "accept-language": "pt-PT,pt;q=0.9,en-US;q=0.8,en;q=0.7",
@@ -168,10 +182,10 @@ class PawsManager:
             "authority": "api.paws.community",
             "Origin": "https://app.paws.community",
             "Referer": "https://app.paws.community/",
-            "User-Agent": UserAgent().random,
+            "User-Agent": user_agent,
             "sec-ch-ua": '"Chromium";v="130", "Google Chrome";v="130", "Not?A_Brand";v="99"',
-            "sec-ch-ua-mobile": "?0",
-            "sec-ch-ua-platform": '"Windows"',
+            "sec-ch-ua-mobile": "?1" if ("Android" in user_agent or "iPhone" in user_agent or "iPad" in user_agent) else "?0",
+            "sec-ch-ua-platform": f'"{platform}"',
             "sec-fetch-dest": "empty",
             "sec-fetch-mode": "cors",
             "sec-fetch-site": "same-site"
@@ -182,7 +196,6 @@ class PawsManager:
         try:
             data = {
                 "data": self.data,
-                "referralCode": "zuQoecuU"
             }
             
             self.log("Tentando login...", "info")
