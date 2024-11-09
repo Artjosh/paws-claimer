@@ -1,0 +1,9 @@
+aiohttp==3.9.3
+aiofiles==23.2.1
+colorama==0.4.6
+python-dateutil==2.8.2
+cloudscraper==1.2.71
+requests==2.31.0
+fake-useragent==1.4.0
+aiohttp-socks==0.8.4
+typing-extensions==4.9.0

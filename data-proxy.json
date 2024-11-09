@@ -1,0 +1,14 @@
+{
+    "accounts": [
+        {
+            "acc_info": "queryid",
+            "proxy_info": "156.233.72.42:3128",
+            "wallet": "UQDsF1mYN7XCg3v7Z8_Lur7qdXpBfS26Dsrgv8J8f-djBhaZ"
+        },
+        {
+            "acc_info": "queryid",
+            "proxy_info": "156.233.72.42:3128",
+            "wallet": "UQCt8p-_OlKG_hcGZUGqXAhiyTTLeaLcEZg9pAMKAJDFp7Tt"
+        }
+    ]
+}
