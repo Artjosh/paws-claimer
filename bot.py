@@ -16,6 +16,7 @@ import sys
 import logging
 import concurrent.futures
 import threading
+from queue import Queue
 
 class PawsManager:
     
@@ -40,6 +41,9 @@ class PawsManager:
         }
         self.print_lock = threading.Lock()
         init()  # Inicializa colorama
+        self.account_queue = Queue()
+        self.active_threads = 0
+        self.thread_lock = threading.Lock()
 
     async def make_request(self, method, url, **kwargs):
         """Sistema de requisições com retry e bypass"""
@@ -212,7 +216,19 @@ class PawsManager:
                 self.wallet_base = user_data.get("userData", {}).get("wallet", "")
                 
                 self.log("Login successfully!", "success")
-                self.log(f"Name: {user_data['userData']['username']} | Balance: {user_data['gameData']['balance']}", "info")
+                
+                # Lógica para pegar o nome do usuário
+                user_info = user_data.get('userData', {})
+                if 'username' in user_info:
+                    name = user_info['username']
+                elif 'firstname' in user_info:
+                    name = user_info['firstname']
+                else:
+                    name = 'Unknown'
+                    
+                balance = user_data.get('gameData', {}).get('balance', 0)
+                self.log(f"Name: {name} | Balance: {balance}", "info")
+                
                 return True
                 
             else:
@@ -331,43 +347,55 @@ class PawsManager:
                 self.session = None
 
     def main(self):
-        """Função principal com multithreading"""
+        """Função principal com gerenciamento dinâmico de threads"""
         try:
-            while True:
-                with open('data-proxy.json', 'r') as f:
-                    data = json.loads(f.read())
+            with open('data-proxy.json', 'r') as f:
+                data = json.loads(f.read())
+            
+            accounts = data['accounts']
+            total_accounts = len(accounts)
+            self.log(f"Total accounts to process: {total_accounts}", "info")
+            
+            # Preenche a fila com todas as contas
+            for i, account in enumerate(accounts):
+                self.account_queue.put((i + 1, account))
+            
+            # Cria pool de threads
+            with concurrent.futures.ThreadPoolExecutor(max_workers=self.config['WORKERS']) as executor:
+                futures = set()
                 
-                accounts = data['accounts']
-                total_accounts = len(accounts)
-                self.log(f"Total accounts to process: {total_accounts}", "info")
-                
-                with concurrent.futures.ThreadPoolExecutor(max_workers=self.config['WORKERS']) as executor:
-                    futures = []
-                    for i, account in enumerate(accounts, 1):
-                        random_delay = random.uniform(0.100, 0.200)
-                        time.sleep(random_delay)
+                while not self.account_queue.empty() or futures:
+                    # Adiciona novas tasks enquanto houver contas e threads disponíveis
+                    while len(futures) < self.config['WORKERS'] and not self.account_queue.empty():
+                        account_number, account = self.account_queue.get()
                         
                         account_manager = PawsManager(
                             data=account['acc_info'],
                             proxy=account['proxy_info'] if self.config['USE_PROXY'] else None,
-                            account_number=i,
+                            account_number=account_number,
                             wallet=account['wallet']
                         )
                         
-                        futures.append(
-                            executor.submit(
-                                lambda: asyncio.run(account_manager.process_account_async(account, i, total_accounts))
-                            )
+                        future = executor.submit(
+                            lambda: asyncio.run(account_manager.process_account_async(
+                                account, account_number, total_accounts
+                            ))
                         )
+                        futures.add(future)
                     
-                    for future in concurrent.futures.as_completed(futures):
-                        try:
-                            future.result()
-                        except Exception as e:
-                            self.log(f"Thread error: {str(e)}", "error")
-                
-                self.log("Waiting 600 seconds before next execution...", "info")
-                time.sleep(600)
+                    # Aguarda qualquer thread terminar
+                    done, futures = concurrent.futures.wait(
+                        futures, 
+                        return_when=concurrent.futures.FIRST_COMPLETED
+                    )
+                    
+                    # Remove as threads concluídas
+                    futures = futures
+                    
+                    # Pequeno delay para evitar sobrecarga
+                    time.sleep(0.1)
+            
+            self.log("All accounts have been processed. Exiting...", "info")
                 
         except Exception as e:
             self.log(f"Critical error: {str(e)}", "error")

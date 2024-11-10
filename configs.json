@@ -1,4 +1,4 @@
 {
-    "WORKERS": 1,
-    "USE_PROXY": false
+    "WORKERS": 30,
+    "USE_PROXY": true
 }
